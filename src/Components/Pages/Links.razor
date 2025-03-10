@@ -2,7 +2,7 @@
 @using Conesoft.Files
 @using Conesoft.Hosting
 
-@page "/"
+@page "/favourites"
 
 @rendermode InteractiveServer
 
@@ -10,20 +10,24 @@
 @inject AuthenticationStateProvider authenticationStateProvider
 
 <main>
-    <section id="addnewentry">
-        <form>
-            <input type="text" @bind="@url" />
-            <select class="select-element" @bind="urlCategory">
-                <LiveDirectory Directory="@storage">
-                    @foreach (var category in context.Directories)
-                    {
-                        <option value="@category.Name">@category.Name</option>
+    <LiveDirectory Directory="@storage">
+        <section id="addnewentry" inert=@(!context.Directories.Any())>
+            <form>
+                <input type="text" placeholder="favourite url to add" @bind="@url" />
+                <select @bind="urlCategory">
+                    @{
+                        var first = true;
+                        foreach (var category in context.Directories)
+                        {
+                            <option value="@category.Name" selected="@first">@category.Name</option>
+                            first = false;
+                        }
                     }
-                </LiveDirectory>
-            </select>
-            <button @onclick=@AddNewsSource>＋</button>
-        </form>
-    </section>
+                </select>
+                <button @onclick=@AddFavourite>＋</button>
+            </form>
+        </section>
+    </LiveDirectory>
 
     <section id="categories" title="categories">
         <ul class="without-icon">
@@ -36,10 +40,8 @@
                         }
                     </LiveDirectory>
                 </section>
-                <form>
-                    <input type="text" @bind="@category" />
-                    <button @onclick=@AddCategory>＋</button>
-                </form>
+                <input type="text" placeholder="category to add" @bind="@category" @bind:event="oninput" @onkeydown=@AddCategoryIfEnter />
+                <button @onclick=@AddCategory>＋</button>
             </li>
         </ul>
     </section>
@@ -59,10 +61,14 @@
                                     <li>
                                         <section>
                                             <a href="@file.Now.ReadText()" target="_blank">
-                                                @file.NameWithoutExtension
+                                                @file.Now.ReadText()
                                             </a>
-                                            <i>@file.Now.ReadText()</i>
                                         </section>
+                                        <menu>
+                                            <li>
+                                                <button title="delete" dangerous @onclick=@(() => RemoveFavourite(file))>✕</button>
+                                            </li>
+                                        </menu>
                                     </li>
                                 }
                             </LiveDirectory>
@@ -88,12 +94,13 @@
         if (state?.User?.Identity?.Name is string name)
         {
             username = name;
-            storage = environment.Global.Storage / "news" / name;
+            storage = environment.Global.Storage / "favourites" / name;
             storage.Create();
+            urlCategory = storage?.Directories.Select(d => d.Name).FirstOrDefault() ?? "";
         }
     }
 
-    public async Task AddNewsSource()
+    public async Task AddFavourite()
     {
         if (storage != null && string.IsNullOrWhiteSpace(url) == false)
         {
@@ -107,11 +114,21 @@
         }
     }
 
+    public Task RemoveFavourite(File file) => file.Delete();
+
     public void AddCategory()
     {
         if (storage != null && string.IsNullOrWhiteSpace(category) == false)
         {
             (storage / category).Create();
+        }
+    }
+
+    public void AddCategoryIfEnter(KeyboardEventArgs eventArgs)
+    {
+        if(eventArgs.Code == "Enter" || eventArgs.Code == "NumpadEnter")
+        {
+            AddCategory();
         }
     }
 }

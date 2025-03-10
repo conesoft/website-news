@@ -1,0 +1,28 @@
+#addnewentry form {
+    grid-template-columns: 1fr auto 2rem;
+}
+
+#addnewentry * {
+    grid-column: auto;
+}
+
+#addnewentry select {
+    padding-inline: 1rem;
+}
+
+#categories ul {
+    grid-template-columns: 1fr auto 2rem;
+}
+
+#categories li {
+    display: contents;
+}
+
+    #categories * {
+        grid-column: auto;
+        flex-grow: 0;
+    }
+
+a, a * {
+    display: inline;
+}
