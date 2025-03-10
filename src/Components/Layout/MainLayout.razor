@@ -1,0 +1,16 @@
+﻿@inherits LayoutComponentBase
+
+<PageTitle>News</PageTitle>
+
+<UserHeaderNav>
+    <HomeButtonContent>⌂</HomeButtonContent>
+    <NavContent>
+        <NavLink href="/">news</NavLink>
+    </NavContent>
+</UserHeaderNav>
+
+<AuthorizeView>
+    <Authorized>
+        @Body
+    </Authorized>
+</AuthorizeView>
