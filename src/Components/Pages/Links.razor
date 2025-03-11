@@ -10,46 +10,42 @@
 @inject AuthenticationStateProvider authenticationStateProvider
 
 <main>
-    <LiveDirectory Directory="@storage">
-        <section id="addnewentry" inert=@(!context.Directories.Any())>
-            <form>
-                <input type="text" placeholder="favourite url to add" @bind="@url" />
-                <select @bind="urlCategory">
-                    @{
-                        var first = true;
-                        foreach (var category in context.Directories)
-                        {
-                            <option value="@category.Name" selected="@first">@category.Name</option>
-                            first = false;
-                        }
-                    }
-                </select>
-                <button @onclick=@AddFavourite>＋</button>
-            </form>
-        </section>
-    </LiveDirectory>
-
-    <section id="categories" title="categories">
-        <ul class="without-icon">
-            <li>
-                <section>
-                    <LiveDirectory Directory="@storage">
-                        @foreach (var directory in context.Directories)
-                        {
-                            <b>@directory.Name</b>
-                        }
-                    </LiveDirectory>
-                </section>
-                <input type="text" placeholder="category to add" @bind="@category" @bind:event="oninput" @onkeydown=@AddCategoryIfEnter />
-                <button @onclick=@AddCategory>＋</button>
-            </li>
-        </ul>
-    </section>
-
     @if (storage != null)
     {
-        <LiveDirectory Directory="@storage" Context="categories">
-            @foreach (var category in categories.Directories)
+        <LiveDirectory Directory="@storage" Context="root" OnLive="OnLiveRoot">
+            <section id="addnewentry" inert=@(!root.Directories.Any())>
+                <form>
+                    <input type="text" placeholder="favourite url to add" @bind="@url" />
+                    <select @bind="urlCategory">
+                        @{
+                            var first = true;
+                            foreach (var category in root.Directories)
+                            {
+                                <option value="@category.Name" selected="@first">@category.Name</option>
+                                first = false;
+                            }
+                        }
+                    </select>
+                    <button @onclick=@AddFavourite>＋</button>
+                </form>
+            </section>
+
+            <section id="categories" title="categories">
+                <ul class="without-icon">
+                    <li>
+                        <section>
+                            @foreach (var directory in root.Directories)
+                            {
+                                <b>@directory.Name</b>
+                            }
+                        </section>
+                        <input type="text" placeholder="category to add" @bind="@category" @bind:event="oninput" @onkeydown=@AddCategoryIfEnter />
+                        <button @onclick=@AddCategory>＋</button>
+                    </li>
+                </ul>
+            </section>
+
+            @foreach (var category in root.Directories)
             {
                 if (category.Files.Any())
                 {
@@ -100,6 +96,12 @@
         }
     }
 
+    public Task OnLiveRoot(Directory directory)
+    {
+        urlCategory = directory.Directories.Select(d => d.Name).FirstOrDefault() ?? "";
+        return Task.CompletedTask;
+    }
+
     public async Task AddFavourite()
     {
         if (storage != null && string.IsNullOrWhiteSpace(url) == false)
@@ -126,7 +128,7 @@
 
     public void AddCategoryIfEnter(KeyboardEventArgs eventArgs)
     {
-        if(eventArgs.Code == "Enter" || eventArgs.Code == "NumpadEnter")
+        if (eventArgs.Code == "Enter" || eventArgs.Code == "NumpadEnter")
         {
             AddCategory();
         }
