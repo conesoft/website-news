@@ -45,6 +45,14 @@
                 </ul>
             </section>
 
+            <section>
+                <ul class="without-icon">
+                    <li>
+                        <SelectItems Items="@tags" @bind-Selected="@selectedTags" Placeholder="select tags"/>
+                    </li>
+                </ul>
+            </section>
+
             @foreach (var category in root.Directories)
             {
                 if (category.Files.Any())
@@ -56,9 +64,7 @@
                                 {
                                     <li>
                                         <section>
-                                            <a href="@file.Now.ReadText()" target="_blank">
-                                                @file.Now.ReadText()
-                                            </a>
+                                            <a href="@file.Now.ReadText()" target="_blank">@file.Now.ReadText()</a>
                                         </section>
                                         <menu>
                                             <li>
@@ -84,6 +90,9 @@
     string urlCategory = "";
     string category = "";
 
+    string[] tags = [];
+    string[] selectedTags = [];
+
     protected override async Task OnInitializedAsync()
     {
         var state = await authenticationStateProvider.GetAuthenticationStateAsync();
@@ -92,13 +101,13 @@
             username = name;
             storage = environment.Global.Storage / "favourites" / name;
             storage.Create();
-            urlCategory = storage?.Directories.Select(d => d.Name).FirstOrDefault() ?? "";
         }
     }
 
     public Task OnLiveRoot(Directory directory)
     {
         urlCategory = directory.Directories.Select(d => d.Name).FirstOrDefault() ?? "";
+        tags = [..directory.Directories.Select(d => d.Name)];
         return Task.CompletedTask;
     }
 

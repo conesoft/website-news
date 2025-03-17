@@ -1,6 +1,7 @@
 using Conesoft.Hosting;
 using Conesoft.PwaGenerator;
 using Conesoft_Website_News.Components;
+using Conesoft_Website_News.Features.RssFinder.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,20 +10,17 @@ builder
     .AddUsersWithStorage()
     .AddHostEnvironmentInfo()
     .AddLoggingService()
+    .AddCompiledHashCacheBuster()
+    .AddHostingDefaults()
     ;
 
 builder.Services
-    .AddCompiledHashCacheBuster()
-    .AddHttpClient()
-
-    .AddRazorComponents().AddInteractiveServerComponents().AddCircuitOptions(options =>
-    {
-        options.DetailedErrors = true;
-        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromSeconds(0);
-        options.DisconnectedCircuitMaxRetained = 0;
-    });
+    .AddSingleton<RssFinderService>()
+    ;
 
 var app = builder.Build();
+
+app.UseCompiledHashCacheBuster();
 
 app.MapPwaInformationFromAppSettings();
 app.MapUsersWithStorage();

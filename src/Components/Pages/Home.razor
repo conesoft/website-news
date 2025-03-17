@@ -1,6 +1,8 @@
 ﻿@using Conesoft.Blazor.Components.Base
 @using Conesoft.Files
 @using Conesoft.Hosting
+@using Conesoft_Website_News.Features.RssFinder.Services
+@using Serilog
 
 @page "/"
 
@@ -8,24 +10,41 @@
 
 @inject HostEnvironment environment
 @inject AuthenticationStateProvider authenticationStateProvider
+@inject RssFinderService rssFinderService
 
 <main>
     <section id="addnewentry">
-        <form>
-            <input type="text" @bind="@url" />
-            <select class="select-element" @bind="urlCategory">
-                <LiveDirectory Directory="@storage">
-                    @foreach (var category in context.Directories)
-                    {
-                        <option value="@category.Name">@category.Name</option>
-                    }
-                </LiveDirectory>
-            </select>
-            <button @onclick=@AddNewsSource>＋</button>
-        </form>
+        <input type="text" @bind="@url" />
+        <select class="select-element" @bind="urlCategory">
+            <LiveDirectory Directory="@storage">
+                @foreach (var category in context.Directories)
+                {
+                    <option value="@category.Name">@category.Name</option>
+                }
+            </LiveDirectory>
+        </select>
+        <button @onclick=@AddNewsSource>＋</button>
     </section>
 
-    <section id="categories" title="categories">
+    @if (foundUrls?.Length > 0)
+    {
+        <section>
+            <ul class="without-icon">
+                @foreach (var foundUrl in foundUrls)
+                {
+                    <li>
+                        <section>@foundUrl</section>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+    else if (foundUrls != null)
+    {
+        <aside>no rss feeds found :(</aside>
+    }
+
+    @*     <section id="categories" title="categories">
         <ul class="without-icon">
             <li>
                 <section>
@@ -71,7 +90,7 @@
                 }
             }
         </LiveDirectory>
-    }
+    } *@
 </main>
 
 @code {
@@ -81,6 +100,8 @@
     string url = "";
     string urlCategory = "";
     string category = "";
+
+    string[]? foundUrls = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -95,16 +116,17 @@
 
     public async Task AddNewsSource()
     {
-        if (storage != null && string.IsNullOrWhiteSpace(url) == false)
-        {
-            var file = storage / urlCategory / Filename.From(new Uri(url).Host, "txt");
-            while (file.Exists)
-            {
-                file = file.Parent / Filename.From(file.NameWithoutExtension + " x", file.Extension);
-            }
-            file.Parent.Create();
-            await file.WriteText(url);
-        }
+        foundUrls = await rssFinderService.FindRssFeedsOnUrl(url);
+        // if (storage != null && string.IsNullOrWhiteSpace(url) == false)
+        // {
+        //     var file = storage / urlCategory / Filename.From(new Uri(url).Host, "txt");
+        //     while (file.Exists)
+        //     {
+        //         file = file.Parent / Filename.From(file.NameWithoutExtension + " x", file.Extension);
+        //     }
+        //     file.Parent.Create();
+        //     await file.WriteText(url);
+        // }
     }
 
     public void AddCategory()
