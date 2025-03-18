@@ -11,34 +11,31 @@
 @inject RssFinderService rssFinderService
 
 <main>
-    <section>
-        <AddText Placeholder="domain to scan for rss feed / rss feed url" TextChanged="AddNewsSource" />
-    </section>
+    <AddText Placeholder="domain to scan for rss feed / rss feed url" TextChanged="AddNewsSource" />
 
-    @if (urls?.Length > 0)
-    {
-        <section>
-            <ul class="without-icon">
-                @foreach (var url in urls)
-                {
-                    <li>
-                        <section>@url</section>
-                    </li>
-                }
-            </ul>
-        </section>
-    }
-    else if (urls != null)
-    {
-        <aside>no rss feeds found :(</aside>
-    }
+    <section>
+        <ListItems Items="@urls" class="without-icon">
+            <ItemContent>
+                <section><a href="@context" target="_blank">@context</a></section>
+            </ItemContent>
+            <EmptyContent>
+                <aside>no rss feeds found :(</aside>
+            </EmptyContent>
+        </ListItems>
+    </section>
 </main>
 
 @code {
-    string[]? urls = null;
+    List<string> urls = [];
 
-    public async Task AddNewsSource(string url)
+    public async Task AddNewsSource(AddText.AddTextArgs args)
     {
-        urls = await rssFinderService.FindRssFeedsOnUrl(url);
+        urls.Clear();
+        StateHasChanged();
+        await foreach(var link in rssFinderService.FindRssFeedsOnUrl(args.Value, args.Cancellation))
+        {
+            urls.Add(link);
+            StateHasChanged();
+        }
     }
 }

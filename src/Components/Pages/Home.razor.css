@@ -1,14 +1,15 @@
-#addnewentry {
-    grid-template-columns: 1fr 2rem;
-    place-self: stretch;
-}
 
-aside {
+::deep aside {
     place-self: stretch;
     text-align: center;
     font-style: italic;
     font-weight: 100;
     color: var(--background-color);
+}
+
+::deep section:has(aside:only-child) > * {
+    background: transparent !important;
+    box-shadow: none;
 }
 
 #addnewentry * {
