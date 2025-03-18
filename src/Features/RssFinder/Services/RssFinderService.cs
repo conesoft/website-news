@@ -1,6 +1,7 @@
-﻿using Conesoft.Tools;
-using HtmlAgilityPack;
+﻿using AngleSharp.Html.Parser;
+using Conesoft.Tools;
 using System.Buffers;
+using System.Diagnostics;
 
 namespace Conesoft_Website_News.Features.RssFinder.Services;
 
@@ -18,12 +19,12 @@ public class RssFinderService(IHttpClientFactory factory)
         var found = content.IndexOfAny(searchValues) switch
         {
             -1 => [],
-            int i when content[i..].StartsWith("<html") => FindInHtmlDocument(content, url),
+            int i when content[i..].StartsWith("<html") => await FindInHtmlDocument(content.ToString(), url),
             int i when content[i..].StartsWith("<rss") => [url],
             _ => []
         };
 
-        if(trymore == true)
+        if (trymore == true)
         {
             url = url.EndsWith('/') ? url[..^1] : url;
             found = found.Length > 0 ? found : await FindRssFeedsOnUrl(url + "/feed/", trymore = false);
@@ -33,21 +34,20 @@ public class RssFinderService(IHttpClientFactory factory)
         return found;
     }
 
-    private static string[] FindInHtmlDocument(ReadOnlySpan<char> content, string url)
+    private static async Task<string[]> FindInHtmlDocument(string content, string url)
     {
-        var document = new HtmlDocument();
-        document.LoadHtml(content.ToString());
-
-        return [.. document.DocumentNode
-            .Descendants("link")
-            .Where(n => n.Attributes["type"] != null && n.Attributes["type"].Value == "application/rss+xml")
-            .Select(n => Safe.Try(() => FixIfRelativeUrl(n.Attributes["href"].Value, url)))
+        var document = await new HtmlParser().ParseDocumentAsync(content);
+        return [.. document
+            .QuerySelectorAll("[type='application/rss+xml']")
+            .Select(tag => Safe.Try(() => FixIfRelativeUrl(tag.GetAttribute("href"), url)))
             .NotNull()
         ];
     }
 
-    private static string FixIfRelativeUrl(string url, string domain)
+    private static string? FixIfRelativeUrl(string? url, string domain)
     {
+        if (url == null) return null;
+
         var src = new Uri(domain, UriKind.Absolute);
         var dst = new Uri(url, UriKind.RelativeOrAbsolute);
         return dst.IsAbsoluteUri switch

@@ -1,5 +1,5 @@
 #addnewentry {
-    grid-template-columns: 1fr auto 2rem;
+    grid-template-columns: 1fr 2rem;
     place-self: stretch;
 }
 

@@ -8,21 +8,11 @@
 
 @rendermode InteractiveServer
 
-@inject HostEnvironment environment
-@inject AuthenticationStateProvider authenticationStateProvider
 @inject RssFinderService rssFinderService
 
 <main>
     <section id="addnewentry">
-        <input type="text" @bind="@url" />
-        <select class="select-element" @bind="urlCategory">
-            <LiveDirectory Directory="@storage">
-                @foreach (var category in context.Directories)
-                {
-                    <option value="@category.Name">@category.Name</option>
-                }
-            </LiveDirectory>
-        </select>
+        <input type="text" placeholder="domain to scan for rss feed / rss feed url" @bind="@url" @bind:event="oninput" @onkeydown=@AddNewsSourceIfEnter />
         <button @onclick=@AddNewsSource>＋</button>
     </section>
 
@@ -43,97 +33,22 @@
     {
         <aside>no rss feeds found :(</aside>
     }
-
-    @*     <section id="categories" title="categories">
-        <ul class="without-icon">
-            <li>
-                <section>
-                    <LiveDirectory Directory="@storage">
-                        @foreach (var directory in context.Directories)
-                        {
-                            <b>@directory.Name</b>
-                        }
-                    </LiveDirectory>
-                </section>
-                <form>
-                    <input type="text" @bind="@category" />
-                    <button @onclick=@AddCategory>＋</button>
-                </form>
-            </li>
-        </ul>
-    </section>
-
-    @if (storage != null)
-    {
-        <LiveDirectory Directory="@storage" Context="categories">
-            @foreach (var category in categories.Directories)
-            {
-                if (category.Files.Any())
-                {
-                    <section title="@category.Name">
-                        <ul class="without-icon">
-                            <LiveDirectory Directory="@category">
-                                @foreach (var file in context.Files)
-                                {
-                                    <li>
-                                        <section>
-                                            <a href="@file.Now.ReadText()" target="_blank">
-                                                @file.NameWithoutExtension
-                                            </a>
-                                            <i>@file.Now.ReadText()</i>
-                                        </section>
-                                    </li>
-                                }
-                            </LiveDirectory>
-                        </ul>
-                    </section>
-                }
-            }
-        </LiveDirectory>
-    } *@
 </main>
 
 @code {
-    Directory? storage;
-    string? username;
-
     string url = "";
-    string urlCategory = "";
-    string category = "";
-
     string[]? foundUrls = null;
-
-    protected override async Task OnInitializedAsync()
-    {
-        var state = await authenticationStateProvider.GetAuthenticationStateAsync();
-        if (state?.User?.Identity?.Name is string name)
-        {
-            username = name;
-            storage = environment.Global.Storage / "news" / name;
-            storage.Create();
-        }
-    }
 
     public async Task AddNewsSource()
     {
         foundUrls = await rssFinderService.FindRssFeedsOnUrl(url);
-        // if (storage != null && string.IsNullOrWhiteSpace(url) == false)
-        // {
-        //     var file = storage / urlCategory / Filename.From(new Uri(url).Host, "txt");
-        //     while (file.Exists)
-        //     {
-        //         file = file.Parent / Filename.From(file.NameWithoutExtension + " x", file.Extension);
-        //     }
-        //     file.Parent.Create();
-        //     await file.WriteText(url);
-        // }
     }
 
-    public void AddCategory()
+    public void AddNewsSourceIfEnter(KeyboardEventArgs eventArgs)
     {
-        if (storage != null && string.IsNullOrWhiteSpace(category) == false)
+        if (eventArgs.Code == "Enter" || eventArgs.Code == "NumpadEnter")
         {
-            (storage / category).Create();
+            AddNewsSource();
         }
     }
 }
