@@ -1,7 +1,6 @@
 ﻿using AngleSharp.Html.Parser;
 using Conesoft.Tools;
 using System.Buffers;
-using System.Diagnostics;
 
 namespace Conesoft_Website_News.Features.RssFinder.Services;
 
@@ -50,10 +49,7 @@ public class RssFinderService(IHttpClientFactory factory)
 
         var src = new Uri(domain, UriKind.Absolute);
         var dst = new Uri(url, UriKind.RelativeOrAbsolute);
-        return dst.IsAbsoluteUri switch
-        {
-            false => new UriBuilder(src.Scheme, src.Host, src.Port, url).Uri.ToString(),
-            true => dst.ToString()
-        };
+
+        return (dst.IsAbsoluteUri ? dst : new Uri(src, dst)).ToString();
     }
 }

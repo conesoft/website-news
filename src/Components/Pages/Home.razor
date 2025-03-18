@@ -11,44 +11,34 @@
 @inject RssFinderService rssFinderService
 
 <main>
-    <section id="addnewentry">
-        <input type="text" placeholder="domain to scan for rss feed / rss feed url" @bind="@url" @bind:event="oninput" @onkeydown=@AddNewsSourceIfEnter />
-        <button @onclick=@AddNewsSource>＋</button>
+    <section>
+        <AddText Placeholder="domain to scan for rss feed / rss feed url" TextChanged="AddNewsSource" />
     </section>
 
-    @if (foundUrls?.Length > 0)
+    @if (urls?.Length > 0)
     {
         <section>
             <ul class="without-icon">
-                @foreach (var foundUrl in foundUrls)
+                @foreach (var url in urls)
                 {
                     <li>
-                        <section>@foundUrl</section>
+                        <section>@url</section>
                     </li>
                 }
             </ul>
         </section>
     }
-    else if (foundUrls != null)
+    else if (urls != null)
     {
         <aside>no rss feeds found :(</aside>
     }
 </main>
 
 @code {
-    string url = "";
-    string[]? foundUrls = null;
+    string[]? urls = null;
 
-    public async Task AddNewsSource()
+    public async Task AddNewsSource(string url)
     {
-        foundUrls = await rssFinderService.FindRssFeedsOnUrl(url);
-    }
-
-    public void AddNewsSourceIfEnter(KeyboardEventArgs eventArgs)
-    {
-        if (eventArgs.Code == "Enter" || eventArgs.Code == "NumpadEnter")
-        {
-            AddNewsSource();
-        }
+        urls = await rssFinderService.FindRssFeedsOnUrl(url);
     }
 }
