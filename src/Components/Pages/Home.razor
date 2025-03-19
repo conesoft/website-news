@@ -4,6 +4,7 @@
 @using Conesoft.Hosting
 @using Conesoft_Website_News.Features.RssFinder.Services
 @using Serilog
+@using System.Net
 @using static Conesoft_Website_News.Features.RssFinder.Services.RssFinderService
 
 @page "/"
@@ -23,7 +24,7 @@
         <section title="found">
             <ListItems Items="@feeds" class="with-icon">
                 <ItemContent>
-                    <img class="icon" src="@(context.Image ?? "/icons/rss.svg")" />
+                    <img class="icon" src="@(context.Image != null ? $"/external/{WebUtility.UrlEncode(context.Image)}" : "/icons/rss.svg")" />
                     <section>
                         <a href="@context.Url" target="_blank">@context.Title</a>
                         <i>@context.Url</i>

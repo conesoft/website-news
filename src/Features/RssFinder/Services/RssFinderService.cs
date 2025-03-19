@@ -15,12 +15,11 @@ public class RssFinderService(IHttpClientFactory factory)
         public string? Image { get; init; }
     };
 
-    [SuppressMessage("Style", "IDE0306", Justification = "Lol Bug")]
     public async IAsyncEnumerable<RssFeed> FindRssFeedsOnUrl(string url, [EnumeratorCancellation] CancellationToken cancellation)
     {
-        url = FixUrl(url);
+        url = FixUrl(url, removescheme: true, fixpath: true);
 
-        Queue<string> links = new(GetKnownUrlsFor(url));
+        Queue<string> links = new([.. GetKnownUrlsFor(url), .. GetKnownUrlsFor("www." + url)]);
         HashSet<string> visited = [];
         string? image = null;
 
@@ -30,9 +29,11 @@ public class RssFinderService(IHttpClientFactory factory)
         {
             var current = links.Dequeue();
 
+            current = FixUrl(current, addscheme: true);
+
             var content = (await Safe.TryAsync(() => client.GetStringAsync(current, cancellation))) ?? "";
 
-            image ??= await FaviconInHtml(content, url);
+            image ??= await FaviconInHtml(content, url, client);
 
             if (await IsRssFeed(current, content) is string feed && visited.Contains(feed) == false && visited.Contains(content) == false)
             {
@@ -44,7 +45,7 @@ public class RssFinderService(IHttpClientFactory factory)
                 yield return new RssFeed(Url: feed, details.Title, Site: details.Link)
                 {
                     Description = details.Description,
-                    Image = details.ImageUrl ?? image
+                    Image = FixIfRelativeUrl(details.ImageUrl, url) ?? image
                 };
             }
             else
@@ -84,15 +85,18 @@ public class RssFinderService(IHttpClientFactory factory)
         ];
     }
 
-    static async Task<string?> FaviconInHtml(string content, string url)
+    static async Task<string?> FaviconInHtml(string content, string url, HttpClient client)
     {
         var document = await new HtmlParser().ParseDocumentAsync(content);
+        var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1)).Token;
         return
-            FixIfRelativeUrl(document.QuerySelector("meta[content][property='og:image']")?.GetAttribute("content"), url)
+            await CheckIfUrlAvailable(FixIfRelativeUrl(document.QuerySelector("meta[content][property='og:image']")?.GetAttribute("content"), url), client, timeout)
             ??
-            FixIfRelativeUrl(document.QuerySelector("link[href$='.svg'][rel*='icon']")?.GetAttribute("href"), url)
+            await CheckIfUrlAvailable(FixIfRelativeUrl(document.QuerySelector("link[href$='.svg'][rel*='icon']")?.GetAttribute("href"), url), client, timeout)
             ??
-            FixIfRelativeUrl(document.QuerySelector("link[href][rel*='icon']")?.GetAttribute("href"), url)
+            await CheckIfUrlAvailable(FixIfRelativeUrl(document.QuerySelector("link[href][rel*='icon']")?.GetAttribute("href"), url), client, timeout)
+            ??
+            await CheckIfUrlAvailable(url + "/favicon.ico", client, timeout)
             ;
     }
 
@@ -103,12 +107,31 @@ public class RssFinderService(IHttpClientFactory factory)
         return _child == _parent || _child.Contains($".{_parent}");
     }
 
-    static string FixUrl(string url)
+    static string FixUrl(string url, bool addscheme = false, bool removescheme = false, bool fixpath = false)
     {
-        url = url.StartsWith("http://") ? url["http://".Length..] : url;
-        url = url.StartsWith("https://") ? url : $"https://{url}";
-        url = url.EndsWith('/') ? url[..^1] : url;
+        if (addscheme)
+        {
+            url = url.StartsWith("http://") ? url["http://".Length..] : url;
+            url = url.StartsWith("https://") ? url : $"https://{url}";
+        }
+        if(removescheme)
+        {
+            url = url.StartsWith("http://") ? url["http://".Length..] : url;
+            url = url.StartsWith("https://") ? url["https://".Length..] : url;
+        }
+        if (fixpath)
+        {
+            url = url.EndsWith('/') ? url[..^1] : url;
+        }
         return url;
+    }
+
+    static async Task<string?> CheckIfUrlAvailable(string? url, HttpClient client, CancellationToken token)
+    {
+        if (url == null) return null;
+
+        var response = await Safe.TryAsync(() => client.SendAsync(new HttpRequestMessage(HttpMethod.Head, url), token));
+        return response?.IsSuccessStatusCode ?? false ? url : null;
     }
 
     static string? FixIfRelativeUrl(string? url, string domain)
