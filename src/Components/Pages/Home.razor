@@ -1,41 +1,111 @@
-﻿@using Conesoft.Blazor.Components.Base
+﻿@using CodeHollow.FeedReader
+@using Conesoft.Blazor.Components.Base
 @using Conesoft.Files
 @using Conesoft.Hosting
 @using Conesoft_Website_News.Features.RssFinder.Services
 @using Serilog
+@using static Conesoft_Website_News.Features.RssFinder.Services.RssFinderService
 
 @page "/"
 
 @rendermode InteractiveServer
 
 @inject RssFinderService rssFinderService
+@inject HostEnvironment environment
+@inject AuthenticationStateProvider authenticationStateProvider
+@inject IHttpClientFactory factory
 
 <main>
-    <AddText Placeholder="domain to scan for rss feed / rss feed url" TextChanged="AddNewsSource" />
+    <AddText Placeholder="domain to scan for rss feed / rss feed url" TextChanged="FindNewsSource" />
 
-    <section>
-        <ListItems Items="@urls" class="without-icon">
-            <ItemContent>
-                <section><a href="@context" target="_blank">@context</a></section>
-            </ItemContent>
-            <EmptyContent>
-                <aside>no rss feeds found :(</aside>
-            </EmptyContent>
-        </ListItems>
-    </section>
+    @if (feeds != null)
+    {
+        <section title="found">
+            <ListItems Items="@feeds" class="with-icon">
+                <ItemContent>
+                    <img class="icon" src="@(context.Image ?? "/icons/rss.svg")" />
+                    <section>
+                        <a href="@context.Url" target="_blank">@context.Title</a>
+                        <i>@context.Url</i>
+                    </section>
+                    <menu>
+                        <li>
+                            <button @onclick="() => AddNewsSource(context)">＋</button>
+                        </li>
+                    </menu>
+                </ItemContent>
+                <EmptyContent>
+                    <aside>no rss feeds found :(</aside>
+                </EmptyContent>
+            </ListItems>
+        </section>
+    }
+
+
+    @if (storage != null && storage.Files.Any())
+    {
+        <section title="subscribed">
+            <LiveDirectory Directory="@storage" Context="directory">
+                <ListItems Items="@directory.Files.ToArray()" class="with-icon">
+                    <ItemContent>
+                        @if (context.Now.ReadFromJson<RssFeed>() is RssFeed feed)
+                        {
+                            <img class="icon" src="@(feed.Image ?? "/icons/rss.svg")" />
+                            <section>
+                                <a href="@feed.Url" target="_blank">@feed.Title</a>
+                                <i>@feed.Url</i>
+                            </section>
+                        }
+                        else
+                        {
+                            <section>
+                                <i>file @context.Name could not be read :(</i>
+                            </section>
+                        }
+                        <menu>
+                            <li dangerous>
+                                <button @onclick="() => context.Delete()">⨯</button>
+                            </li>
+                        </menu>
+                    </ItemContent>
+                </ListItems>
+            </LiveDirectory>
+        </section>
+    }
 </main>
 
 @code {
-    List<string> urls = [];
+    List<RssFeed>? feeds = null;
+    Directory? storage = null;
 
-    public async Task AddNewsSource(AddText.AddTextArgs args)
+    protected override async Task OnInitializedAsync()
     {
-        urls.Clear();
-        StateHasChanged();
-        await foreach(var link in rssFinderService.FindRssFeedsOnUrl(args.Value, args.Cancellation))
+        var state = await authenticationStateProvider.GetAuthenticationStateAsync();
+        if (state?.User?.Identity?.Name is string name)
         {
-            urls.Add(link);
+            storage = environment.Global.Storage / "news" / "feeds" / name;
+            storage.Create();
+        }
+    }
+
+    public async Task FindNewsSource(AddText.AddTextArgs args)
+    {
+        await foreach (var feed in rssFinderService.FindRssFeedsOnUrl(args.Value, args.Cancellation))
+        {
+            feeds ??= [];
+            feeds.Add(feed);
             StateHasChanged();
+        }
+    }
+
+    public async Task AddNewsSource(RssFeed feed)
+    {
+        if (storage != null)
+        {
+            var file = storage / Filename.From(new Uri(feed.Site).Host, "json");
+            await file.WriteAsJson(feed);
+            feeds?.Remove(feed);
+            if (feeds?.Count == 0) feeds = null;
         }
     }
 }

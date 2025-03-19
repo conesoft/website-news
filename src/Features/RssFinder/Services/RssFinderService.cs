@@ -1,4 +1,5 @@
 ﻿using AngleSharp.Html.Parser;
+using CodeHollow.FeedReader;
 using Conesoft.Tools;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
@@ -8,14 +9,20 @@ namespace Conesoft_Website_News.Features.RssFinder.Services;
 
 public class RssFinderService(IHttpClientFactory factory)
 {
+    public record RssFeed(string Url, string Title, string Site)
+    {
+        public string? Description { get; init; }
+        public string? Image { get; init; }
+    };
 
     [SuppressMessage("Style", "IDE0306", Justification = "Lol Bug")]
-    public async IAsyncEnumerable<string> FindRssFeedsOnUrl(string url, [EnumeratorCancellation] CancellationToken cancellation)
+    public async IAsyncEnumerable<RssFeed> FindRssFeedsOnUrl(string url, [EnumeratorCancellation] CancellationToken cancellation)
     {
         url = FixUrl(url);
 
         Queue<string> links = new(GetKnownUrlsFor(url));
         HashSet<string> visited = [];
+        string? image = null;
 
         var client = factory.CreateClient();
 
@@ -25,10 +32,20 @@ public class RssFinderService(IHttpClientFactory factory)
 
             var content = (await Safe.TryAsync(() => client.GetStringAsync(current, cancellation))) ?? "";
 
-            if (await IsRssFeed(current, content) is string feed && visited.Contains(feed) == false)
+            image ??= await FaviconInHtml(content, url);
+
+            if (await IsRssFeed(current, content) is string feed && visited.Contains(feed) == false && visited.Contains(content) == false)
             {
                 visited.Add(feed);
-                yield return feed;
+                visited.Add(content);
+
+                var details = FeedReader.ReadFromString(content);
+
+                yield return new RssFeed(Url: feed, details.Title, Site: details.Link)
+                {
+                    Description = details.Description,
+                    Image = details.ImageUrl ?? image
+                };
             }
             else
             {
@@ -49,14 +66,8 @@ public class RssFinderService(IHttpClientFactory factory)
     static async Task<string?> IsRssFeed(string url, string content)
     {
         if (content.AsSpan().ContainsAny(rssSearchValues) == false) return null;
-
         var document = await new HtmlParser().ParseDocumentAsync(content);
-        var canonical = document.QuerySelector("feed > id")?.TextContent ?? document.QuerySelector("rss > id")?.TextContent;
-        canonical ??= document.QuerySelector("[rel='self'][href][type='application/rss+xml'],[rel='self'][href][type='application/atom+xml'],a[href*='/rss']")?.GetAttribute("href");
-
-        canonical = FixIfRelativeUrl(canonical, url);
-
-        return document.QuerySelectorAll("entry, item").Length > 0 ? canonical ?? url : null;
+        return document.QuerySelectorAll("entry, item").Length > 0 ? url : null;
     }
 
     static async Task<string[]> LinksInHtml(string content, string url)
@@ -71,6 +82,18 @@ public class RssFinderService(IHttpClientFactory factory)
             .Where(link => IsSameHost(link, url))
             .DistinctBy(url => new Uri(url).AbsolutePath)
         ];
+    }
+
+    static async Task<string?> FaviconInHtml(string content, string url)
+    {
+        var document = await new HtmlParser().ParseDocumentAsync(content);
+        return
+            FixIfRelativeUrl(document.QuerySelector("meta[content][property='og:image']")?.GetAttribute("content"), url)
+            ??
+            FixIfRelativeUrl(document.QuerySelector("link[href$='.svg'][rel*='icon']")?.GetAttribute("href"), url)
+            ??
+            FixIfRelativeUrl(document.QuerySelector("link[href][rel*='icon']")?.GetAttribute("href"), url)
+            ;
     }
 
     static bool IsSameHost(string child, string parent)
@@ -95,7 +118,7 @@ public class RssFinderService(IHttpClientFactory factory)
         var src = new Uri(domain, UriKind.Absolute);
         var dst = new Uri(url, UriKind.RelativeOrAbsolute);
 
-        if (dst.HostNameType != UriHostNameType.Dns) return domain;
+        if (dst.IsAbsoluteUri && dst.HostNameType != UriHostNameType.Dns) return domain;
 
         return (dst.IsAbsoluteUri ? dst : new Uri(src, dst)).ToString();
     }
