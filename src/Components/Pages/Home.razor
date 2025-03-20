@@ -2,6 +2,7 @@
 @using Conesoft.Blazor.Components.Base
 @using Conesoft.Files
 @using Conesoft.Hosting
+@using Conesoft_Website_News.Features.Refresher.Interfaces
 @using Conesoft_Website_News.Features.RssFinder.Services
 @using Serilog
 @using System.Net
@@ -15,6 +16,7 @@
 @inject HostEnvironment environment
 @inject AuthenticationStateProvider authenticationStateProvider
 @inject IHttpClientFactory factory
+@inject IContentRefresher contentRefresher
 
 <main>
     <AddText Placeholder="domain to scan for rss feed / rss feed url" TextChanged="FindNewsSource" />
@@ -107,6 +109,8 @@
             await file.WriteAsJson(feed);
             feeds?.Remove(feed);
             if (feeds?.Count == 0) feeds = null;
+
+            contentRefresher.BeginRefresh(feed.Site);
         }
     }
 }

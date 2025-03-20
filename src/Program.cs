@@ -1,8 +1,10 @@
 using Conesoft.Hosting;
 using Conesoft.PwaGenerator;
 using Conesoft_Website_News.Components;
+using Conesoft_Website_News.Features.ExternalContent.Extensions;
+using Conesoft_Website_News.Features.Refresher.Extensions;
 using Conesoft_Website_News.Features.RssFinder.Services;
-using System.Net;
+using Conesoft_Website_News.Features.RssReader.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +15,9 @@ builder
     .AddLoggingService()
     .AddCompiledHashCacheBuster()
     .AddHostingDefaults()
+
+    .AddContentRefresher()
+    .AddRssReaderService()
     ;
 
 builder.Services
@@ -26,8 +31,7 @@ app.UseCompiledHashCacheBuster();
 app.MapPwaInformationFromAppSettings();
 app.MapUsersWithStorage();
 app.MapStaticAssets();
+app.MapExternalContent();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
-
-app.Map("/external/{url}", async (string url, IHttpClientFactory factory) => Results.Bytes(await factory.CreateClient().GetByteArrayAsync(WebUtility.UrlDecode(url))));
 
 app.Run();
