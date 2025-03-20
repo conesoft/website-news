@@ -24,9 +24,9 @@ public class RssFinderService(IHttpClientFactory factory)
 
         while (links.Count > 0 && cancellation.IsCancellationRequested == false)
         {
-            var current = links.Dequeue();
-
-            var t = Task.Run(async () =>
+            var _links = links.ToArray();
+            links.Clear();
+            var tasks = _links.Select(async current =>
             {
                 var client = factory.CreateClient();
 
@@ -35,7 +35,7 @@ public class RssFinderService(IHttpClientFactory factory)
                 var content = (await Safe.TryAsync(() => client.GetStringAsync(current, cancellation))) ?? "";
 
                 var _image = await FaviconInHtml(content, url, client);
-                lock(this)
+                lock (this)
                 {
                     image ??= _image;
                 }
@@ -60,7 +60,7 @@ public class RssFinderService(IHttpClientFactory factory)
                 {
                     foreach (var link in (await LinksInHtml(content, current)).Where(link => visited.Contains(link) == false))
                     {
-                        lock(this)
+                        lock (this)
                         {
                             visited.Add(current);
                             links.Enqueue(link);
@@ -69,9 +69,13 @@ public class RssFinderService(IHttpClientFactory factory)
                 }
                 return null;
             });
-            if(await t is RssFeed feed)
+
+            await foreach(var task in Task.WhenEach(tasks))
             {
-                yield return feed;
+                if(await task is RssFeed feed)
+                {
+                    yield return feed;
+                }
             }
         }
     }
