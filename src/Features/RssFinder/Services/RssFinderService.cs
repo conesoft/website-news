@@ -32,9 +32,9 @@ public class RssFinderService(IHttpClientFactory factory)
 
                 current = FixUrl(current, addscheme: true);
 
-                var content = (await Safe.TryAsync(() => client.GetStringAsync(current, cancellation))) ?? "";
+                var content = (await Safe.Silent.TryAsync(() => client.GetStringAsync(current, cancellation))) ?? "";
 
-                var _image = await FaviconInHtml(content, url, client);
+                var _image = await FaviconInHtml(content, url, client, cancellation);
                 lock (this)
                 {
                     image ??= _image;
@@ -105,19 +105,16 @@ public class RssFinderService(IHttpClientFactory factory)
         ];
     }
 
-    static async Task<string?> FaviconInHtml(string content, string url, HttpClient client)
+    static async Task<string?> FaviconInHtml(string content, string url, HttpClient client, CancellationToken cancellation)
     {
         var document = await new HtmlParser().ParseDocumentAsync(content);
-        var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1)).Token;
-        return
-            await CheckIfUrlAvailable(FixIfRelativeUrl(document.QuerySelector("meta[content][property='og:image']")?.GetAttribute("content"), url), client, timeout)
-            ??
-            await CheckIfUrlAvailable(FixIfRelativeUrl(document.QuerySelector("link[href$='.svg'][rel*='icon']")?.GetAttribute("href"), url), client, timeout)
-            ??
-            await CheckIfUrlAvailable(FixIfRelativeUrl(document.QuerySelector("link[href][rel*='icon']")?.GetAttribute("href"), url), client, timeout)
-            ??
-            await CheckIfUrlAvailable(url + "/favicon.ico", client, timeout)
-            ;
+        Task<string?>[] requests = [
+            CheckIfUrlAvailable(FixIfRelativeUrl(document.QuerySelector("meta[content][property='og:image']")?.GetAttribute("content"), url), client, cancellation),
+            CheckIfUrlAvailable(FixIfRelativeUrl(document.QuerySelector("link[href$='.svg'][rel*='icon']")?.GetAttribute("href"), url), client, cancellation),
+            CheckIfUrlAvailable(FixIfRelativeUrl(document.QuerySelector("link[href][rel*='icon']")?.GetAttribute("href"), url), client, cancellation),
+            CheckIfUrlAvailable(url + "/favicon.ico", client, cancellation)
+        ];
+        return await requests[0] ?? await requests[1] ?? await requests[2] ?? await requests[3];
     }
 
     static bool IsSameHost(string child, string parent)
@@ -146,11 +143,11 @@ public class RssFinderService(IHttpClientFactory factory)
         return url;
     }
 
-    static async Task<string?> CheckIfUrlAvailable(string? url, HttpClient client, CancellationToken token)
+    static async Task<string?> CheckIfUrlAvailable(string? url, HttpClient client, CancellationToken cancellation)
     {
         if (url == null) return null;
 
-        var response = await Safe.TryAsync(() => client.SendAsync(new HttpRequestMessage(HttpMethod.Head, url), token));
+        var response = await Safe.Silent.TryAsync(() => client.SendAsync(new HttpRequestMessage(HttpMethod.Head, url), cancellation));
         return response?.IsSuccessStatusCode ?? false ? url : null;
     }
 
