@@ -2,7 +2,6 @@
 using CodeHollow.FeedReader;
 using Conesoft.Tools;
 using System.Buffers;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Conesoft_Website_News.Features.RssFinder.Services;
@@ -23,40 +22,57 @@ public class RssFinderService(IHttpClientFactory factory)
         HashSet<string> visited = [];
         string? image = null;
 
-        var client = factory.CreateClient();
-
         while (links.Count > 0 && cancellation.IsCancellationRequested == false)
         {
             var current = links.Dequeue();
 
-            current = FixUrl(current, addscheme: true);
-
-            var content = (await Safe.TryAsync(() => client.GetStringAsync(current, cancellation))) ?? "";
-
-            image ??= await FaviconInHtml(content, url, client);
-
-            if (await IsRssFeed(current, content) is string feed && visited.Contains(feed) == false && visited.Contains(content) == false)
+            var t = Task.Run(async () =>
             {
-                visited.Add(feed);
-                visited.Add(content);
+                var client = factory.CreateClient();
 
-                var details = FeedReader.ReadFromString(content);
+                current = FixUrl(current, addscheme: true);
 
-                yield return new RssFeed(Url: feed, details.Title, Site: details.Link)
+                var content = (await Safe.TryAsync(() => client.GetStringAsync(current, cancellation))) ?? "";
+
+                var _image = await FaviconInHtml(content, url, client);
+                lock(this)
                 {
-                    Description = details.Description,
-                    Image = FixIfRelativeUrl(details.ImageUrl, url) ?? image
-                };
-            }
-            else
-            {
-                foreach (var link in (await LinksInHtml(content, current)).Where(link => visited.Contains(link) == false))
-                {
-                    visited.Add(current);
-                    links.Enqueue(link);
+                    image ??= _image;
                 }
-            }
 
+                if (await IsRssFeed(current, content) is string feed && visited.Contains(feed) == false && visited.Contains(content) == false)
+                {
+                    lock (this)
+                    {
+                        visited.Add(feed);
+                        visited.Add(content);
+                    }
+
+                    var details = FeedReader.ReadFromString(content);
+
+                    return new RssFeed(Url: feed, details.Title, Site: details.Link)
+                    {
+                        Description = details.Description,
+                        Image = FixIfRelativeUrl(details.ImageUrl, url) ?? image
+                    };
+                }
+                else
+                {
+                    foreach (var link in (await LinksInHtml(content, current)).Where(link => visited.Contains(link) == false))
+                    {
+                        lock(this)
+                        {
+                            visited.Add(current);
+                            links.Enqueue(link);
+                        }
+                    }
+                }
+                return null;
+            });
+            if(await t is RssFeed feed)
+            {
+                yield return feed;
+            }
         }
     }
 
@@ -114,7 +130,7 @@ public class RssFinderService(IHttpClientFactory factory)
             url = url.StartsWith("http://") ? url["http://".Length..] : url;
             url = url.StartsWith("https://") ? url : $"https://{url}";
         }
-        if(removescheme)
+        if (removescheme)
         {
             url = url.StartsWith("http://") ? url["http://".Length..] : url;
             url = url.StartsWith("https://") ? url["https://".Length..] : url;
