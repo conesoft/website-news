@@ -138,7 +138,7 @@ public class RssFinderService(IHttpClientFactory factory)
     {
         if (url == null) return null;
 
-        var src = new Uri(domain, UriKind.Absolute);
+        var src = new Uri(FixUrl(domain, addscheme: true), UriKind.Absolute);
         var dst = new Uri(url, UriKind.RelativeOrAbsolute);
 
         if (dst.IsAbsoluteUri && dst.HostNameType != UriHostNameType.Dns) return domain;
