@@ -1,6 +1,7 @@
 ﻿using AngleSharp.Html.Parser;
 using CodeHollow.FeedReader;
 using Conesoft.Tools;
+using Conesoft_Website_News.Features.RssContent.Data;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 
@@ -8,12 +9,6 @@ namespace Conesoft_Website_News.Features.RssFinder.Services;
 
 public class RssFinderService(IHttpClientFactory factory)
 {
-    public record RssFeed(string Url, string Title, string Site)
-    {
-        public string? Description { get; init; }
-        public string? Image { get; init; }
-    };
-
     public async IAsyncEnumerable<RssFeed> FindRssFeedsOnUrl(string url, [EnumeratorCancellation] CancellationToken cancellation)
     {
         url = FixUrl(url, removescheme: true, fixpath: true);

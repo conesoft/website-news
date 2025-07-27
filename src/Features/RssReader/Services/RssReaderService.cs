@@ -1,7 +1,7 @@
 ﻿using CodeHollow.FeedReader;
 using Conesoft.Files;
 using Conesoft.Hosting;
-using Conesoft_Website_News.Features.RssFinder.Services;
+using Conesoft_Website_News.Features.RssContent.Data;
 using Serilog;
 
 namespace Conesoft_Website_News.Features.RssReader.Services;
@@ -13,7 +13,7 @@ public class RssReaderService(HostEnvironment environment)
         var feedStorage = environment.Global.Storage / "news" / "feeds";
         var contentStorage = environment.Global.Storage / "news" / "content";
 
-        var sources = await feedStorage.AllFiles.ReadFromJson<RssFinderService.RssFeed>();
+        var sources = await feedStorage.AllFiles.ReadFromJson<RssFeed>();
 
         foreach (var source in sources.Where(s => url == null || s.Content.Site == url).OrderByDescending(f => f.Info.CreationTime))
         {

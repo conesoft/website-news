@@ -1,0 +1,7 @@
+﻿namespace Conesoft_Website_News.Features.RssContent.Data;
+
+public record RssFeed(string Url, string Title, string Site)
+{
+    public string? Description { get; init; }
+    public string? Image { get; init; }
+};
